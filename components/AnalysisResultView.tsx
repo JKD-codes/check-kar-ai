@@ -34,7 +34,7 @@ const AnalysisResultView: React.FC<AnalysisResultViewProps> = ({ result, imagePr
 
   const handleDownloadReport = async () => {
     try {
-      // Dynamically import jsPDF to prevent app crash on load if module resolution fails
+      // Dynamically import jsPDF
       const module = await import('jspdf');
       const jsPDF = module.jsPDF || (module as any).default;
       
@@ -43,124 +43,148 @@ const AnalysisResultView: React.FC<AnalysisResultViewProps> = ({ result, imagePr
       }
 
       const doc = new jsPDF();
-      
-      // Title
+      let yPos = 20; // Track vertical position dynamically
+
+      // Helper to add text and update yPos with page break check
+      const addText = (text: string, fontSize: number, fontType: string, color: [number, number, number] | null = null, indent: number = 20) => {
+         doc.setFontSize(fontSize);
+         doc.setFont("helvetica", fontType);
+         if (color) doc.setTextColor(color[0], color[1], color[2]);
+         else doc.setTextColor(0, 0, 0);
+
+         const lines = doc.splitTextToSize(text, 170); // 170mm width (A4 is 210mm - margins)
+         
+         lines.forEach((line: string) => {
+             if (yPos > 280) { // Bottom margin
+                 doc.addPage();
+                 yPos = 20; // Top margin for new page
+             }
+             doc.text(line, indent, yPos);
+             yPos += (fontSize / 2) + 1; // Line height approximation
+         });
+         yPos += 2; // Small paragraph gap
+      };
+
+      // --- HEADER ---
       doc.setFont("helvetica", "bold");
       doc.setFontSize(22);
       doc.setTextColor(59, 130, 246); // Blue
-      doc.text("Check-Kar AI", 20, 20);
+      doc.text("Check-Kar AI", 20, yPos);
       
       doc.setFontSize(14);
       doc.setTextColor(100);
-      doc.text("Detection Report", 20, 28);
+      doc.text("Detection Report", 20, yPos + 8);
       
+      yPos += 15;
       doc.setLineWidth(0.5);
-      doc.line(20, 32, 190, 32);
+      doc.setDrawColor(200);
+      doc.line(20, yPos, 190, yPos);
+      yPos += 10;
 
-      // Verdict
+      // --- VERDICT SECTION ---
       doc.setFontSize(12);
       doc.setTextColor(0);
       doc.setFont("helvetica", "bold");
-      doc.text("Verdict:", 20, 45);
+      doc.text("Verdict:", 20, yPos);
       doc.setFont("helvetica", "normal");
-      doc.text(result.verdict.replace('_', ' '), 50, 45);
+      doc.text(result.verdict.replace('_', ' '), 50, yPos);
+      yPos += 7;
 
       doc.setFont("helvetica", "bold");
-      doc.text("Confidence:", 20, 52);
+      doc.text("Confidence:", 20, yPos);
       doc.setFont("helvetica", "normal");
-      doc.text(`${result.aiLikelihood}% AI / ${result.humanLikelihood}% Human`, 50, 52);
+      doc.text(`${result.aiLikelihood}% AI / ${result.humanLikelihood}% Human`, 50, yPos);
+      yPos += 10;
 
-      // Model Source (if detected)
+      // --- MODEL SOURCE ---
       if (result.verdict === 'LIKELY_AI' && result.sourceGenerator && result.sourceGenerator !== 'N/A') {
         doc.setFont("helvetica", "bold");
         doc.setTextColor(220, 38, 38); // Red
-        doc.text("Suspected Model Source:", 20, 59);
+        doc.text("Suspected Model Source:", 20, yPos);
+        
+        // Wrap model name if surprisingly long, though usually short
         doc.setFont("helvetica", "normal");
         doc.setTextColor(0);
-        doc.text(result.sourceGenerator, 75, 59);
+        const modelName = result.sourceGenerator;
+        doc.text(modelName, 80, yPos);
+        yPos += 7;
 
         if (result.modelSpecificArtifacts) {
-           doc.setFont("helvetica", "italic");
-           doc.setFontSize(10);
-           const splitArtifacts = doc.splitTextToSize(result.modelSpecificArtifacts, 160);
-           doc.text(splitArtifacts, 20, 65);
-           // Adjust Y position based on length of artifact text
-           // This is a rough estimation, normally we'd track Y pos
+           addText(result.modelSpecificArtifacts, 10, "italic", [80, 80, 80]);
+        } else {
+           yPos += 3;
         }
+      } else {
+        yPos += 3;
       }
 
-      // Indicators
-      // Start lower to account for potentially long artifact text
-      let yPos = 85; 
-      
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(12);
-      doc.text("Key Indicators:", 20, yPos);
-      doc.setFont("helvetica", "normal");
-      yPos += 7;
-      result.indicators.forEach((ind) => {
-        doc.text(`• ${ind}`, 25, yPos);
-        yPos += 7;
-      });
-
-      // Analysis
       yPos += 5;
-      doc.setFont("helvetica", "bold");
-      doc.text("Detailed Analysis:", 20, yPos);
-      yPos += 7;
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(10);
-      const splitAnalysis = doc.splitTextToSize(result.analysis, 170);
-      doc.text(splitAnalysis, 20, yPos);
-      
-      // Technical Details
-      yPos += (splitAnalysis.length * 4) + 12;
-      
-      // Check for page overflow before technical details
-      if (yPos > 250) {
-          doc.addPage();
-          yPos = 20;
-      }
-      
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(12);
-      doc.text("Technical Breakdown:", 20, yPos);
-      yPos += 7;
-      doc.setFontSize(10);
-      doc.setFont("helvetica", "normal");
-      
-      doc.text(`Lighting: ${result.technicalDetails.lighting}`, 20, yPos);
-      yPos += 6;
-      doc.text(`Texture: ${result.technicalDetails.texture}`, 20, yPos);
-      yPos += 6;
-      doc.text(`Composition: ${result.technicalDetails.composition}`, 20, yPos);
-      yPos += 6;
-      doc.text(`Artifacts: ${result.technicalDetails.artifacts}`, 20, yPos);
 
-      // Potential Prompt - Only if LIKELY_AI
-      if (result.verdict === 'LIKELY_AI' && result.potentialPrompt) {
-          yPos += 12;
-          if (yPos > 260) {
-            doc.addPage();
-            yPos = 20;
+      // --- INDICATORS ---
+      addText("Key Indicators:", 12, "bold", [0,0,0]);
+      
+      result.indicators.forEach((ind) => {
+         addText(`• ${ind}`, 10, "normal", null, 25);
+      });
+      yPos += 5;
+
+      // --- DETAILED ANALYSIS ---
+      addText("Detailed Analysis:", 12, "bold", [0,0,0]);
+      addText(result.analysis, 10, "normal", [0,0,0]);
+      yPos += 5;
+
+      // --- TECHNICAL BREAKDOWN ---
+      addText("Technical Breakdown:", 12, "bold", [0,0,0]);
+      
+      const techFields = [
+          { label: "Lighting", value: result.technicalDetails.lighting },
+          { label: "Texture", value: result.technicalDetails.texture },
+          { label: "Composition", value: result.technicalDetails.composition },
+          { label: "Artifacts", value: result.technicalDetails.artifacts },
+      ];
+
+      techFields.forEach(field => {
+          // Check page break before starting a field block to avoid splitting label/value awkwardly if possible
+          if (yPos > 270) {
+              doc.addPage();
+              yPos = 20;
           }
-          doc.setFont("helvetica", "bold");
-          doc.setFontSize(12);
-          doc.text("Reverse-Engineered Prompt:", 20, yPos);
-          yPos += 7;
           doc.setFontSize(10);
-          doc.setFont("helvetica", "italic");
-          const splitPrompt = doc.splitTextToSize(result.potentialPrompt, 170);
-          doc.text(splitPrompt, 20, yPos);
+          doc.setFont("helvetica", "bold");
+          doc.text(`${field.label}:`, 20, yPos);
+          
+          // Calculate indentation for value
+          const labelWidth = doc.getTextWidth(`${field.label}: `);
+          const valueLines = doc.splitTextToSize(field.value, 170 - labelWidth);
+          
+          doc.setFont("helvetica", "normal");
+          valueLines.forEach((line: string, index: number) => {
+              if (yPos > 280) {
+                  doc.addPage();
+                  yPos = 20;
+              }
+              // Indent first line by label width, subsequent lines align with label or indent further
+              const xOffset = index === 0 ? 20 + labelWidth + 2 : 20; 
+              doc.text(line, xOffset, yPos);
+              yPos += 5;
+          });
+          yPos += 2;
+      });
+      yPos += 5;
+
+      // --- POTENTIAL PROMPT ---
+      if (result.verdict === 'LIKELY_AI' && result.potentialPrompt) {
+          addText("Reverse-Engineered Prompt:", 12, "bold", [0,0,0]);
+          addText(`"${result.potentialPrompt}"`, 10, "italic", [80,80,80]);
       }
 
-      // Footer
+      // --- FOOTER ---
       const pageCount = doc.getNumberOfPages();
       for(let i = 1; i <= pageCount; i++) {
         doc.setPage(i);
         doc.setFontSize(8);
         doc.setTextColor(150);
-        doc.text(`Generated by Check-Kar AI Detector on ${new Date().toLocaleDateString()}`, 20, 280);
+        doc.text(`Generated by Check-Kar AI Detector on ${new Date().toLocaleDateString()} - Page ${i} of ${pageCount}`, 20, 285);
       }
 
       doc.save("Check-Kar-Report.pdf");
@@ -355,7 +379,7 @@ Check-Kar AI Detector
         {/* Analysis Text */}
         <div className="bg-slate-800 rounded-xl p-6 border border-slate-700 shadow-lg">
           <h3 className="text-lg font-semibold text-white mb-4">Detailed Analysis</h3>
-          <p className="text-slate-300 leading-relaxed">
+          <p className="text-slate-300 leading-relaxed break-words">
             {result.analysis}
           </p>
         </div>
