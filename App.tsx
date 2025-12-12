@@ -357,7 +357,7 @@ const App: React.FC = () => {
                      <a href="#" className="p-2 bg-slate-800 rounded-full hover:bg-slate-700 text-slate-400 hover:text-white transition-all duration-300 hover:scale-110 hover:bg-purple-600">
                         <BookOpen className="w-6 h-6" />
                      </a>
-                     <a href="mailto:contact@example.com" className="p-2 bg-slate-800 rounded-full hover:bg-slate-700 text-slate-400 hover:text-white transition-all duration-300 hover:scale-110 hover:bg-pink-600">
+                     <a href="jagratjkd@gmail.com" className="p-2 bg-slate-800 rounded-full hover:bg-slate-700 text-slate-400 hover:text-white transition-all duration-300 hover:scale-110 hover:bg-pink-600">
                         <Info className="w-6 h-6" />
                      </a>
                   </div>
