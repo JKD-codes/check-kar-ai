@@ -81,4 +81,4 @@ GEMINI_API_KEY="YOUR_ACTUAL_GEMINI_API_KEY_HERE"</code></pre>
         
    </div>
 </body>
-</html>
+</html> 
